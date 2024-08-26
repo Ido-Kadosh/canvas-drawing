@@ -7,9 +7,21 @@ interface PropTypes {
 	backgroundColor?: string;
 }
 
-const Canvas = ({ height = 500, width = 500, backgroundColor = '#cccccc' }: PropTypes) => {
+const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes, ref) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [isDrawing, setIsDrawing] = useState(false);
+	useImperativeHandle(ref, () => ({
+		clearCanvas: () => {
+			if (canvasRef.current) {
+				const context = canvasRef.current.getContext('2d');
+				if (!context) return;
+				context.fillStyle = backgroundColor;
+				context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+				setSavedImageData(null);
+				context.beginPath();
+			}
+		},
+	}));
 
 	// reset canvas on prop changes
 	useEffect(() => {
@@ -92,6 +104,6 @@ const Canvas = ({ height = 500, width = 500, backgroundColor = '#cccccc' }: Prop
 	});
 
 	return <canvas ref={canvasRef} className="flex-grow-0 flex-shrink-0" />;
-};
+});
 
 export default Canvas;
