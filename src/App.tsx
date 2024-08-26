@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import Canvas, { DrawMode } from './components/Canvas';
 
 const App = () => {
-	const [drawMode, setDrawMode] = useState<DrawMode>('freeDraw');
+	const [drawMode, setDrawMode] = useState<DrawMode>('pencil');
 	const canvasRef = useRef<{ clearCanvas: () => void }>(null);
 
 	return (
@@ -12,7 +12,7 @@ const App = () => {
 				<button
 					className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
 					onClick={() => {
-						setDrawMode('freeDraw');
+						setDrawMode('pencil');
 					}}
 				>
 					Free Draw
