@@ -88,6 +88,7 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 
 			if (drawMode === 'pencil') {
 				context?.beginPath();
+				context.moveTo(startX, startY);
 				currentPencilPathRef.current = { points: [{ x: startX, y: startY }] };
 				shapesRef.current.pencils.push({ points: [{ x: startX, y: startY }] });
 				return;
