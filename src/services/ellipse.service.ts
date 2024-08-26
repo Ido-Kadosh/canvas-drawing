@@ -3,10 +3,14 @@ import { Shape } from '../types/canvas';
 export class EllipseShape implements Shape {
 	private initialX: number;
 	private initialY: number;
+	private startCenterX: number;
+	private startCenterY: number;
 
 	constructor(public centerX: number, public centerY: number, public radiusX: number, public radiusY: number) {
 		this.initialX = centerX;
 		this.initialY = centerY;
+		this.startCenterX = centerX;
+		this.startCenterY = centerY;
 	}
 
 	draw(ctx: CanvasRenderingContext2D) {
@@ -18,23 +22,25 @@ export class EllipseShape implements Shape {
 	onMouseDown(x: number, y: number) {
 		this.initialX = x;
 		this.initialY = y;
+		this.startCenterX = this.centerX;
+		this.startCenterY = this.centerY;
 	}
 
 	onMouseMove(x: number, y: number, isDrawing: boolean): void {
 		if (isDrawing) {
-			// Adjust the size and position during drawing
 			this.centerX = (this.initialX + x) / 2;
 			this.centerY = (this.initialY + y) / 2;
 			this.radiusX = Math.abs(x - this.initialX) / 2;
 			this.radiusY = Math.abs(y - this.initialY) / 2;
 		} else {
-			this.centerX = x - this.radiusX;
-			this.centerY = y - this.radiusY;
+			const dx = x - this.initialX;
+			const dy = y - this.initialY;
+			this.centerX = this.startCenterX + dx;
+			this.centerY = this.startCenterY + dy;
 		}
 	}
 
 	isPointOnBorder(x: number, y: number, borderWidth: number): boolean {
-		// Ellipse point on border logic
 		const dx = x - this.centerX;
 		const dy = y - this.centerY;
 		const distanceSquared = (dx * dx) / (this.radiusX * this.radiusX) + (dy * dy) / (this.radiusY * this.radiusY);
