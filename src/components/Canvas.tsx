@@ -28,8 +28,8 @@ interface PropTypes {
 const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes, ref) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [isDrawing, setIsDrawing] = useState(false);
-	const [shapes, setShapes] = useState<Shapes>({ rectangles: [], pencils: [] });
-	const [currentPencilPath, setCurrentPencilPath] = useState<Pencil | null>(null);
+	const shapesRef = useRef<Shapes>({ rectangles: [], pencils: [] });
+	const currentPencilPathRef = useRef<Pencil | null>(null);
 	const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
 	const [initialShapePos, setInitialShapePos] = useState<{ x: number; y: number } | null>(null);
 	const [selectedShapeIndex, setSelectedShapeIndex] = useState<number | null>(null);
@@ -49,7 +49,7 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 				context.fillRect(0, 0, context.canvas.width, context.canvas.height);
 				setSavedImageData(null);
 				context.beginPath();
-				setShapes({ rectangles: [], pencils: [] });
+				shapesRef.current = { rectangles: [], pencils: [] };
 			}
 		},
 	}));
@@ -69,8 +69,8 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 			setSavedImageData(imageData);
 
 			// Check if the click is inside any rectangle
-			for (let i = 0; i < shapes.rectangles.length; i++) {
-				const currRect = shapes.rectangles[i];
+			for (let i = 0; i < shapesRef.current.rectangles.length; i++) {
+				const currRect = shapesRef.current.rectangles[i];
 				if (
 					startX >= currRect.x &&
 					startX <= currRect.x + currRect.width &&
@@ -88,18 +88,15 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 
 			if (drawMode === 'pencil') {
 				context?.beginPath();
-				setCurrentPencilPath({ points: [{ x: startX, y: startY }] });
-				setShapes(prev => ({
-					...prev,
-					pencils: [...prev.pencils, { points: [{ x: startX, y: startY }] }],
-				}));
+				currentPencilPathRef.current = { points: [{ x: startX, y: startY }] };
+				shapesRef.current.pencils.push({ points: [{ x: startX, y: startY }] });
 				return;
 			}
 
 			setStartPos({ x: startX, y: startY });
 			context.moveTo(startX, startY);
 		},
-		[canvasRef, drawMode, shapes]
+		[canvasRef, drawMode]
 	);
 
 	const handleMouseMove = useCallback(
@@ -112,14 +109,10 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 			const context = canvasRef.current.getContext('2d');
 
 			const drawPencil = () => {
-				if (!currentPencilPath) return;
-				const updatedPoints = [...currentPencilPath.points, { x: currentX, y: currentY }];
-				setCurrentPencilPath({ points: updatedPoints });
-				setShapes(prev => {
-					const pencilsExceptLast = prev.pencils.slice(0, -1); // Copy all pencils except the last one
-					const updatedPencils = [...pencilsExceptLast, { points: updatedPoints }]; // Update the last pencil with new points
-					return { ...prev, pencils: updatedPencils };
-				});
+				if (!currentPencilPathRef.current) return;
+				const updatedPoints = [...currentPencilPathRef.current.points, { x: currentX, y: currentY }];
+				currentPencilPathRef.current = { points: updatedPoints };
+				shapesRef.current.pencils[shapesRef.current.pencils.length - 1].points = updatedPoints;
 				context?.lineTo(currentX, currentY);
 				context?.stroke();
 			};
@@ -136,7 +129,7 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 
 			const moveShape = () => {
 				if (selectedShapeIndex === null || !startPos || !initialShapePos) return;
-				const newRectangles = [...shapes.rectangles];
+				const newRectangles = [...shapesRef.current.rectangles];
 				const selectedRect = newRectangles[selectedShapeIndex];
 
 				// Calculate the new position of the rectangle based on the initial position and mouse movement
@@ -146,8 +139,7 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 				selectedRect.x = initialShapePos.x + dx;
 				selectedRect.y = initialShapePos.y + dy;
 
-				setShapes(prev => ({ ...prev, rectangles: newRectangles }));
-				redrawCanvas(shapes);
+				redrawCanvas(shapesRef.current);
 			};
 
 			if (selectedShapeIndex !== null && startPos) {
@@ -158,32 +150,32 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 				drawMode === 'rectangle' && drawRectangle();
 			}
 		},
-		[isDrawing, canvasRef, drawMode, startPos, savedImageData, selectedShapeIndex, shapes]
+		[isDrawing, canvasRef, drawMode, startPos, savedImageData, selectedShapeIndex]
 	);
 
 	const handleMouseUpOrLeave = useCallback(
 		(ev: React.MouseEvent) => {
-			// add the rectangle to state only after the mouse is released
+			// add the shape to array only after the mouse is released
 			if (drawMode !== 'pencil' && startPos && isDrawing) {
-				const newRectangles = [
-					...shapes.rectangles,
-					{
-						x: startPos.x,
-						y: startPos.y,
-						width: ev.clientX - startPos.x,
-						height: ev.clientY - startPos.y,
-						rotation: 0,
-					},
-				];
+				const x = Math.min(startPos.x, ev.clientX);
+				const y = Math.min(startPos.y, ev.clientY);
+				const width = Math.abs(ev.clientX - startPos.x);
+				const height = Math.abs(ev.clientY - startPos.y);
 
-				setShapes(prev => ({ ...prev, rectangles: newRectangles }));
+				shapesRef.current.rectangles.push({
+					x,
+					y,
+					width,
+					height,
+					rotation: 0,
+				});
 			}
-
+			redrawCanvas(shapesRef.current);
 			setIsDrawing(false);
 			setSelectedShapeIndex(null);
-			setInitialShapePos(null); // Reset the initial rectangle position
+			setInitialShapePos(null);
 		},
-		[drawMode, isDrawing, startPos, shapes]
+		[drawMode, isDrawing, startPos]
 	);
 
 	const redrawCanvas = (shapes: Shapes) => {
@@ -234,8 +226,8 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 		context.fillStyle = backgroundColor;
 		context.fillRect(0, 0, context.canvas.width, context.canvas.height);
 
-		redrawCanvas(shapes);
-	}, [canvasRef, backgroundColor, shapes]);
+		redrawCanvas(shapesRef.current);
+	}, [canvasRef, backgroundColor]);
 
 	useEventListener({
 		eventName: 'resize',
