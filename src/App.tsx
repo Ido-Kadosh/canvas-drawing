@@ -10,15 +10,19 @@ const App = () => {
 			<Canvas ref={canvasRef} drawMode={drawMode} />
 			<div className="space-x-2 m-auto">
 				<button
-					className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+					className={`${
+						drawMode === 'pencil' ? 'bg-blue-900' : 'bg-blue-500 hover:bg-blue-600'
+					}  text-white font-bold py-2 px-4 rounded`}
 					onClick={() => {
 						setDrawMode('pencil');
 					}}
 				>
-					Free Draw
+					Pencil
 				</button>
 				<button
-					className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+					className={`${
+						drawMode === 'ellipse' ? 'bg-blue-900' : 'bg-blue-500 hover:bg-blue-600'
+					}  text-white font-bold py-2 px-4 rounded`}
 					onClick={() => {
 						setDrawMode('ellipse');
 					}}
@@ -26,7 +30,9 @@ const App = () => {
 					Ellipse
 				</button>
 				<button
-					className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+					className={`${
+						drawMode === 'rectangle' ? 'bg-blue-900' : 'bg-blue-500 hover:bg-blue-600'
+					}  text-white font-bold py-2 px-4 rounded`}
 					onClick={() => {
 						setDrawMode('rectangle');
 					}}
@@ -34,7 +40,7 @@ const App = () => {
 					Rectangle
 				</button>
 				<button
-					className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+					className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
 					onClick={() => {
 						canvasRef.current?.clearCanvas();
 					}}
