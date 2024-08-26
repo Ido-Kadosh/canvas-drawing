@@ -33,10 +33,8 @@ export class ShapeManager {
 
 	handleMouseMove(x: number, y: number, isDrawing: boolean) {
 		if (this.selectedShape && !isDrawing) {
-			// Move the selected shape
 			this.selectedShape.onMouseMove(x, y, false);
 		} else if (this.currentDrawingShape && isDrawing) {
-			// Update the current shape being drawn
 			this.currentDrawingShape.onMouseMove(x, y, true);
 		}
 	}

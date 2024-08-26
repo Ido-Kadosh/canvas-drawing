@@ -26,7 +26,7 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 			const ctx = canvasRef.current?.getContext('2d');
 			if (!ctx) return;
 
-			// Clear the canvas and reset the shape manager
+			// clear the canvas and reset the shape manager
 			ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 			ctx.fillStyle = backgroundColor;
 			ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);

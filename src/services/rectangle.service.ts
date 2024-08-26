@@ -14,7 +14,7 @@ export class RectangleShape implements Shape {
 	}
 
 	onMouseDown(x: number, y: number) {
-		this.initialX = x - this.x; // Store the offset
+		this.initialX = x - this.x;
 		this.initialY = y - this.y;
 	}
 
@@ -29,13 +29,11 @@ export class RectangleShape implements Shape {
 	}
 
 	isPointOnBorder(x: number, y: number, borderWidth: number): boolean {
-		// Calculate the actual bounds of the rectangle
 		const left = Math.min(this.x, this.x + this.width);
 		const right = Math.max(this.x, this.x + this.width);
 		const top = Math.min(this.y, this.y + this.height);
 		const bottom = Math.max(this.y, this.y + this.height);
 
-		// Check if the point is within the border range
 		const withinLeftEdge = Math.abs(x - left) <= borderWidth;
 		const withinRightEdge = Math.abs(x - right) <= borderWidth;
 		const withinTopEdge = Math.abs(y - top) <= borderWidth;
