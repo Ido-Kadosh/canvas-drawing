@@ -13,15 +13,8 @@ const Canvas = ({ height = 500, width = 500, backgroundColor = '#cccccc' }: Prop
 
 	// reset canvas on prop changes
 	useEffect(() => {
-		if (canvasRef.current) {
-			const context = canvasRef.current.getContext('2d');
-			if (!context) return;
-			context.canvas.height = height;
-			context.canvas.width = width;
-			context.fillStyle = backgroundColor;
-			context.fillRect(0, 0, height, width);
-		}
-	}, [height, width, backgroundColor]);
+		handleResize();
+	}, [backgroundColor]);
 
 	const handleMouseDown = useCallback(
 		(ev: React.MouseEvent) => {
@@ -44,17 +37,35 @@ const Canvas = ({ height = 500, width = 500, backgroundColor = '#cccccc' }: Prop
 			const context = canvasRef.current.getContext('2d');
 			const currentX = ev.clientX - rect.left;
 			const currentY = ev.clientY - rect.top;
+				context?.lineTo(currentX, currentY);
+				context?.stroke();
 
 			if (!context) return;
-			context.lineTo(currentX, currentY);
-			context.stroke();
 		},
-		[isDrawing, canvasRef]
+		[isDrawing, canvasRef, drawMode, startPos, savedImageData]
 	);
+	const handleResize = useCallback(() => {
+		if (!canvasRef.current) return;
+		var rect = canvasRef.current.parentElement?.getBoundingClientRect();
+		if (!rect) return;
+
+		const context = canvasRef.current.getContext('2d');
+		if (!context) return;
+		context.canvas.height = window.innerHeight * 0.9;
+		context.canvas.width = rect.width;
+		context.fillStyle = backgroundColor;
+		context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+	}, [canvasRef, backgroundColor]);
 
 	const handleMouseUpOrLeave = useCallback(() => {
 		setIsDrawing(false);
 	}, [setIsDrawing]);
+
+	useEventListener({
+		eventName: 'resize',
+		callback: handleResize,
+		target: window,
+	});
 
 	useEventListener({
 		eventName: 'mousedown',
@@ -80,7 +91,7 @@ const Canvas = ({ height = 500, width = 500, backgroundColor = '#cccccc' }: Prop
 		ref: canvasRef,
 	});
 
-	return <canvas ref={canvasRef} />;
+	return <canvas ref={canvasRef} className="flex-grow-0 flex-shrink-0" />;
 };
 
 export default Canvas;
