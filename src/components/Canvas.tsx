@@ -1,24 +1,10 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import useEventListener from '../hooks/useEventListener';
-
-export type DrawMode = 'rectangle' | 'pencil' | 'ellipse';
-
-export interface Rectangle {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-	rotation: number;
-}
-
-export interface Pencil {
-	points: { x: number; y: number }[];
-}
-
-interface Shapes {
-	pencils: Pencil[];
-	rectangles: Rectangle[];
-}
+import { EllipseShape } from '../services/ellipse.service';
+import { PencilShape } from '../services/pencil.service';
+import { RectangleShape } from '../services/rectangle.service';
+import { ShapeManager } from '../services/shapeManager.service';
+import { DrawMode, Shape } from '../types/canvas';
 
 interface PropTypes {
 	backgroundColor?: string;
@@ -27,189 +13,90 @@ interface PropTypes {
 
 const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes, ref) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const shapeManager = useRef(new ShapeManager());
 	const [isDrawing, setIsDrawing] = useState(false);
-	const shapesRef = useRef<Shapes>({ rectangles: [], pencils: [] });
-	const currentPencilPathRef = useRef<Pencil | null>(null);
-	const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
-	const [initialShapePos, setInitialShapePos] = useState<{ x: number; y: number } | null>(null);
-	const [selectedShapeIndex, setSelectedShapeIndex] = useState<number | null>(null);
-	const [savedImageData, setSavedImageData] = useState<ImageData | null>(null);
 
 	useEffect(() => {
 		handleResize();
 	}, [backgroundColor]);
 
-	// expose clearCanvas to parent component
+	// expose clearCanvas to the parent component
 	useImperativeHandle(ref, () => ({
 		clearCanvas: () => {
-			if (canvasRef.current) {
-				const context = canvasRef.current.getContext('2d');
-				if (!context) return;
-				context.fillStyle = backgroundColor;
-				context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-				setSavedImageData(null);
-				context.beginPath();
-				shapesRef.current = { rectangles: [], pencils: [] };
-			}
+			const ctx = canvasRef.current?.getContext('2d');
+			if (!ctx) return;
+
+			// Clear the canvas and reset the shape manager
+			ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+			ctx.fillStyle = backgroundColor;
+			ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+			shapeManager.current.clearShapes();
 		},
 	}));
 
 	const handleMouseDown = useCallback(
 		(ev: React.MouseEvent) => {
-			// only allow left click
-			if (ev.button !== 0 || !canvasRef.current) return;
-
 			const rect = canvasRef.current?.getBoundingClientRect();
+			if (!rect) return;
 			const startX = ev.clientX - rect.left;
 			const startY = ev.clientY - rect.top;
-			const context = canvasRef.current.getContext('2d');
 
-			if (!context) return;
-			const imageData = context.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-			setSavedImageData(imageData);
+			const existingShapeSelected = shapeManager.current.handleMouseDown(startX, startY);
 
-			// Check if the click is inside any rectangle
-			for (let i = 0; i < shapesRef.current.rectangles.length; i++) {
-				const currRect = shapesRef.current.rectangles[i];
-				if (
-					startX >= currRect.x &&
-					startX <= currRect.x + currRect.width &&
-					startY >= currRect.y &&
-					startY <= currRect.y + currRect.height
-				) {
-					setSelectedShapeIndex(i);
-					setStartPos({ x: startX, y: startY });
-					setInitialShapePos({ x: currRect.x, y: currRect.y });
-					return;
-				}
+			if (existingShapeSelected) return;
+
+			let newShape: Shape | null = null;
+
+			if (drawMode === 'rectangle') {
+				newShape = new RectangleShape(startX, startY, 0, 0);
+			} else if (drawMode === 'ellipse') {
+				newShape = new EllipseShape(startX, startY, 0, 0);
+			} else if (drawMode === 'pencil') {
+				newShape = new PencilShape(startX, startY);
 			}
 
-			setIsDrawing(true);
-
-			if (drawMode === 'pencil') {
-				context?.beginPath();
-				context.moveTo(startX, startY);
-				currentPencilPathRef.current = { points: [{ x: startX, y: startY }] };
-				shapesRef.current.pencils.push({ points: [{ x: startX, y: startY }] });
-				return;
+			// if we're in drawing mode, start drawing a new shape
+			if (newShape) {
+				shapeManager.current.startDrawingShape(newShape);
+				newShape.onMouseDown(startX, startY);
+				setIsDrawing(true);
 			}
-
-			setStartPos({ x: startX, y: startY });
-			context.moveTo(startX, startY);
 		},
-		[canvasRef, drawMode]
+		[drawMode]
 	);
 
 	const handleMouseMove = useCallback(
 		(ev: React.MouseEvent) => {
-			if (!canvasRef.current || !savedImageData) return;
-
-			const rect = canvasRef.current.getBoundingClientRect();
+			const rect = canvasRef.current?.getBoundingClientRect();
+			if (!rect) return;
 			const currentX = ev.clientX - rect.left;
 			const currentY = ev.clientY - rect.top;
-			const context = canvasRef.current.getContext('2d');
 
-			const drawPencil = () => {
-				if (!currentPencilPathRef.current) return;
-				const updatedPoints = [...currentPencilPathRef.current.points, { x: currentX, y: currentY }];
-				currentPencilPathRef.current = { points: updatedPoints };
-				shapesRef.current.pencils[shapesRef.current.pencils.length - 1].points = updatedPoints;
-				context?.lineTo(currentX, currentY);
-				context?.stroke();
-			};
-
-			const drawRectangle = () => {
-				if (!startPos || !savedImageData) return;
-
-				// Temporarily draw the rectangle on the canvas without adding it to state
-				const width = currentX - startPos.x;
-				const height = currentY - startPos.y;
-				context?.putImageData(savedImageData, 0, 0); // Restore the canvas state
-				context?.strokeRect(startPos.x, startPos.y, width, height);
-			};
-
-			const moveShape = () => {
-				if (selectedShapeIndex === null || !startPos || !initialShapePos) return;
-				const newRectangles = [...shapesRef.current.rectangles];
-				const selectedRect = newRectangles[selectedShapeIndex];
-
-				// Calculate the new position of the rectangle based on the initial position and mouse movement
-				const dx = currentX - startPos.x;
-				const dy = currentY - startPos.y;
-
-				selectedRect.x = initialShapePos.x + dx;
-				selectedRect.y = initialShapePos.y + dy;
-
-				redrawCanvas(shapesRef.current);
-			};
-
-			if (selectedShapeIndex !== null && startPos) {
-				moveShape();
-			}
-			if (isDrawing) {
-				drawMode === 'pencil' && drawPencil();
-				drawMode === 'rectangle' && drawRectangle();
-			}
+			shapeManager.current.handleMouseMove(currentX, currentY, isDrawing);
+			redrawCanvas();
 		},
-		[isDrawing, canvasRef, drawMode, startPos, savedImageData, selectedShapeIndex]
+		[isDrawing]
 	);
 
-	const handleMouseUpOrLeave = useCallback(
-		(ev: React.MouseEvent) => {
-			// add the shape to array only after the mouse is released
-			if (drawMode !== 'pencil' && startPos && isDrawing) {
-				const x = Math.min(startPos.x, ev.clientX);
-				const y = Math.min(startPos.y, ev.clientY);
-				const width = Math.abs(ev.clientX - startPos.x);
-				const height = Math.abs(ev.clientY - startPos.y);
+	const handleMouseUp = useCallback(() => {
+		const rect = canvasRef.current?.getBoundingClientRect();
+		if (!rect) return;
 
-				shapesRef.current.rectangles.push({
-					x,
-					y,
-					width,
-					height,
-					rotation: 0,
-				});
-			}
-			redrawCanvas(shapesRef.current);
-			setIsDrawing(false);
-			setSelectedShapeIndex(null);
-			setInitialShapePos(null);
-		},
-		[drawMode, isDrawing, startPos]
-	);
+		shapeManager.current.handleMouseUp();
+		setIsDrawing(false);
+		redrawCanvas();
+	}, []);
 
-	const redrawCanvas = (shapes: Shapes) => {
+	const redrawCanvas = () => {
 		if (!canvasRef.current) return;
-		const context = canvasRef.current.getContext('2d');
-		if (!context) return;
+		const ctx = canvasRef.current.getContext('2d');
+		if (!ctx) return;
 
-		// Clear the canvas
-		context.clearRect(0, 0, context.canvas.width, context.canvas.height);
-		context.fillStyle = backgroundColor;
-		context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+		ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+		ctx.fillStyle = backgroundColor;
+		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-		// Redraw all pencil paths
-		shapes.pencils.forEach(pencil => {
-			context.beginPath();
-			pencil.points.forEach((point, index) => {
-				if (index === 0) {
-					context.moveTo(point.x, point.y);
-				} else {
-					context.lineTo(point.x, point.y);
-					context.stroke();
-				}
-			});
-		});
-
-		// Redraw all rectangles
-		shapes.rectangles.forEach(rect => {
-			context.save();
-			context.translate(rect.x + rect.width / 2, rect.y + rect.height / 2);
-			context.rotate((rect.rotation * Math.PI) / 180);
-			context.strokeRect(-rect.width / 2, -rect.height / 2, rect.width, rect.height);
-			context.restore();
-		});
+		shapeManager.current.drawShapes(ctx);
 	};
 
 	const handleResize = useCallback(() => {
@@ -218,16 +105,16 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 		var rect = canvasRef.current.parentElement?.getBoundingClientRect();
 		if (!rect) return;
 
-		const context = canvasRef.current.getContext('2d');
-		if (!context) return;
+		const ctx = canvasRef.current.getContext('2d');
+		if (!ctx) return;
 
-		context.canvas.height = window.innerHeight * 0.9;
-		context.canvas.width = rect.width;
-		context.lineWidth = 3;
-		context.fillStyle = backgroundColor;
-		context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+		ctx.canvas.height = window.innerHeight * 0.9;
+		ctx.canvas.width = rect.width;
+		ctx.lineWidth = 3;
+		ctx.fillStyle = backgroundColor;
+		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-		redrawCanvas(shapesRef.current);
+		redrawCanvas();
 	}, [canvasRef, backgroundColor]);
 
 	useEventListener({
@@ -250,13 +137,13 @@ const Canvas = forwardRef(({ backgroundColor = '#cccccc', drawMode }: PropTypes,
 
 	useEventListener({
 		eventName: 'mouseup',
-		callback: handleMouseUpOrLeave,
+		callback: handleMouseUp,
 		ref: canvasRef,
 	});
 
 	useEventListener({
 		eventName: 'mouseleave',
-		callback: handleMouseUpOrLeave,
+		callback: handleMouseUp,
 		ref: canvasRef,
 	});
 

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import Canvas, { DrawMode } from './components/Canvas';
+import Canvas from './components/Canvas';
+import { DrawMode } from './types/canvas';
 
 const App = () => {
 	const [drawMode, setDrawMode] = useState<DrawMode>('pencil');
